@@ -57,9 +57,27 @@ typedef enum
 	
 }HTTP_TYPE;
 
+typedef enum 
+{
+	HTTP_RESPONSE_TYPE_OTHER,
+	HTTP_RESPONSE_TYPE_CHUNKED,
+	HTTP_RESPONSE_TYPE_CONTENTLENGTH
+	
+}HTTP_RESPONSE_TYPE;
+
+
+struct ipq_msg
+{
+	struct ipq_handle *h;
+	int status;
+	int current_skb_num;
+	unsigned char buf[BUFSIZE];
+};
+
 struct http_hdr
 {
 	HTTP_TYPE http_type;
+	HTTP_RESPONSE_TYPE res_type;
 	char error_code[COMM_MAX_LEN];
 	char uri[COMM_MAX_LEN];
 	char host[COMM_MAX_LEN];
@@ -79,29 +97,11 @@ struct http_hdr
 	char transfer_encoding[COMM_MAX_LEN];	
 };
 
-struct ipq_msg
-{
-	struct ipq_handle *h;
-	int status;
-	int current_tuple_num;
-	int current_http_num;	
-	unsigned char buf[BUFSIZE];
-};
-
-struct tcp_conntrack
-{
-	struct list_head list;
-	struct list_head http_conntrack_list;
-	unsigned long sip,dip;
-	unsigned short sp,dp;
-};
-
-struct http_conntrack
+struct _skb
 {
 	struct list_head list;
 	struct iphdr *iph;
 	struct tcphdr *tcp;
-	unsigned long seq,ack_seq;
 	struct http_hdr hhdr;
 	int iph_len;
 	int ip_len;
@@ -113,6 +113,31 @@ struct http_conntrack
 	char* http_data;
 	ipq_packet_msg_t *m;
 	unsigned char buf[BUFSIZE];
+};
+
+struct http_conntrack
+{
+	struct list_head list;
+	struct list_head request_conntrack_list;
+	unsigned long ip;
+	char host[COMM_MAX_LEN];
+	unsigned short request_conntrack_num;
+	unsigned long last_time;
+};
+
+struct request_conntrack
+{
+	struct list_head list;
+	struct list_head response_conntrack_list;
+	struct _skb* skb;
+	unsigned short curr_content_length;
+	unsigned short content_length;
+	unsigned short response_conntrack_num;
+};
+struct response_conntrack
+{
+	struct list_head list;
+	struct _skb* skb;
 };
 
 #endif
