@@ -112,7 +112,7 @@ int insert_code(struct _skb *skb)
 	body=strstr(skb->http_head , skb->hhdr.content_length);
 	if(!body)
 		return -1;
-	//memcpy(body , "2952" , 4);
+	memcpy(body , "2952" , 4);
 	debug_log("````````````%s\n" , skb->http_head);
     skb->iph->tot_len=htons(skb->http_len+5);
     skb->iph->check=ip_chsum(skb->iph);
