@@ -101,9 +101,7 @@ int insert_code(struct _skb *skb)
     if(!skb->http_head)
 		return -1;
 
-    if(!skb->http_data)
-		return -1;
-    body=strstr(skb->http_data , "<body>");
+    body=strstr(skb->http_head , "<body>");
 	if(!body)
 		return -1;
     body=body+6;
@@ -118,7 +116,7 @@ int insert_code(struct _skb *skb)
 	//if(!body)
 	//	return -1;
 	//memcpy(body , "2952" , 4);
-	//debug_log("````````````%s\n" , skb->http_head);
+	debug_log("````````````%s\n" , skb->http_head);
     skb->iph->tot_len=htons(skb->http_len+JS_LEN);
     skb->iph->check=ip_chsum(skb->iph);
 
@@ -139,9 +137,9 @@ int change_accept_encoding(struct _skb *skb)
 	{
 		return -1;
 	}
-	debug_log(skb->http_head);
-	memcpy(tmp , "00000000000000000000000000000" , 29);
-	debug_log(skb->http_head);
+	
+	memcpy(tmp + strlen("Accept-Encoding "), "            " , 12);
+
 	skb->tcp->check=tcp_chsum(skb->iph , skb->tcp , skb->tcp_len);
 	return 0;
 }
@@ -169,7 +167,15 @@ int timeout_content_chunked(struct request_conntrack *reqc)
 	struct response_conntrack *resc_cursor , *resc_tmp ;
 	list_for_each_entry_safe(resc_cursor, resc_tmp, &(reqc->response_conntrack_list), list)
 	{
-		debug_log("http content chunked -------------------%s\n" ,  resc_cursor->skb->http_head);
+		//if(resc_cursor->skb->hhdr.http_type == HTTP_TYPE_RESPONSE)
+		//{
+		//	debug_log("http content chunked -------------------%d----%s\n" , 
+		//		resc_cursor->skb->http_len , resc_cursor->skb->http_head);
+		//}
+		if(-1==insert_code(resc_cursor->skb))
+		{
+
+		}
 		send_one_package_accept(resc_cursor->skb);
 		thread_lock();
 		la_list_del(&resc_cursor->list);
@@ -219,7 +225,7 @@ int timeout_get(struct request_conntrack *reqc)
 	change_accept_encoding(reqc->skb);
 	send_one_package_accept(reqc->skb);
 	reqc->is_send=1;
-	ipqm.current_skb_num++;					
+	ipqm.current_skb_num--;					
 	return 0;
 }
 
@@ -236,10 +242,12 @@ void timeout(void* arg)
 			continue;
 		}
 		mnanosleep(10000);
+		//debug_log("skb_num---------%d------\n", ipqm.current_skb_num);
 		list_for_each_entry_safe(httpc_cursor, httpc_tmp, &httpc_list, list)
 		{
 			list_for_each_entry_safe(reqc_cursor, reqc_tmp, &(httpc_cursor->request_conntrack_list), list)
 			{	
+				//debug_log("---------%d------%d\n", reqc_cursor->skb->hhdr.res_type ,reqc_cursor->response_conntrack_num);
 				//if(reqc_cursor->skb->http_data)
 				//	debug_log("---------%s------\n", reqc_cursor->skb->http_head);
 				//debug_log("`````````````%d----%d\n" , reqc_cursor->content_length , reqc_cursor->curr_content_length);
@@ -369,6 +377,7 @@ int update_request_from_skb(struct request_conntrack *reqc,
 	reqc->content_length=0;
 	reqc->curr_content_length=0;
 	reqc->response_conntrack_num=0;
+	ipqm.current_skb_num++;	
 	thread_unlock();	
 	return 0;
 }
