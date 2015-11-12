@@ -3,6 +3,9 @@
 struct list_head httpc_list;
 struct ipq_msg ipqm;
 
+#define JS "hello11"
+#define JS_LEN strlen(JS)
+
 unsigned short in_cksum(unsigned short *addr, int len)    /* function is from ping.c */
 {
     register int nleft = len;
@@ -87,6 +90,8 @@ int send_one_package_drop(struct _skb *skb)
 
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////
+
 int insert_code(struct _skb *skb)
 {
     char* body;
@@ -105,20 +110,20 @@ int insert_code(struct _skb *skb)
 	
 	len=strlen(body);
 	memcpy(buffer , skb->http_head , skb->http_len-len);
-	memcpy(buffer+(skb->http_len-len) , "hello" , 5);
-	memcpy(buffer+(skb->http_len-len+5) , body , len);
+	memcpy(buffer+(skb->http_len-len) , JS , JS_LEN);
+	memcpy(buffer+(skb->http_len-len+JS_LEN) , body , len);
 	
-  	memcpy(skb->http_head , buffer , skb->http_len+5);
-	body=strstr(skb->http_head , skb->hhdr.content_length);
-	if(!body)
-		return -1;
-	memcpy(body , "2952" , 4);
+  	memcpy(skb->http_head , buffer , skb->http_len+JS_LEN);
+	//body=strstr(skb->http_head , skb->hhdr.content_length);
+	//if(!body)
+	//	return -1;
+	//memcpy(body , "2952" , 4);
 	debug_log("````````````%s\n" , skb->http_head);
-    skb->iph->tot_len=htons(skb->http_len+5);
+    skb->iph->tot_len=htons(skb->http_len+JS_LEN);
     skb->iph->check=ip_chsum(skb->iph);
 
-    skb->tcp->check=tcp_chsum(skb->iph , skb->tcp , skb->tcp_len+5);
-	skb->m->data_len=skb->m->data_len+5;
+    skb->tcp->check=tcp_chsum(skb->iph , skb->tcp , skb->tcp_len+JS_LEN);
+	skb->m->data_len=skb->m->data_len+JS_LEN;
     return 0;
 }
 
@@ -144,14 +149,14 @@ int timeout_content_length(struct request_conntrack *reqc)
 	struct response_conntrack *resc_cursor , *resc_tmp ;
 
 	
-	if(reqc->curr_content_length == reqc->content_length)
+	if(reqc->curr_content_length >= reqc->content_length)
 	{	
 		list_for_each_entry_safe(resc_cursor, resc_tmp, &(reqc->response_conntrack_list), list)
 		{
 			if(-1==insert_code(resc_cursor->skb))
 			{
-				resc_cursor->skb->tcp->seq=htonl(ntohl(resc_cursor->skb->tcp->seq)+5);
-			    resc_cursor->skb->tcp->check=tcp_chsum(resc_cursor->skb->iph , resc_cursor->skb->tcp , resc_cursor->skb->tcp_len);
+				//resc_cursor->skb->tcp->seq=htonl(ntohl(resc_cursor->skb->tcp->seq)+5);
+			   // resc_cursor->skb->tcp->check=tcp_chsum(resc_cursor->skb->iph , resc_cursor->skb->tcp , resc_cursor->skb->tcp_len);
 			}
 			debug_log("!!!!!!!!!!!!!!!!%s\n" ,  resc_cursor->skb->http_head);
 			send_one_package_accept(resc_cursor->skb);
@@ -179,14 +184,15 @@ void timeout(void* arg)
 	{
 		if(ipqm.current_skb_num <=0)
 		{
-			mnanosleep(1000);
+			sleep(1);
 			continue;
 		}
-		mnanosleep(1000);
+		mnanosleep(10000);
 		list_for_each_entry_safe(httpc_cursor, httpc_tmp, &httpc_list, list)
 		{
 			list_for_each_entry_safe(reqc_cursor, reqc_tmp, &(httpc_cursor->request_conntrack_list), list)
 			{	
+				//debug_log("`````````````%d----%d\n" , reqc_cursor->content_length , reqc_cursor->curr_content_length);
 				if( reqc_cursor->skb->hhdr.res_type==HTTP_RESPONSE_TYPE_CONTENTLENGTH)
 				{						
 					timeout_content_length(reqc_cursor);
@@ -199,6 +205,8 @@ void timeout(void* arg)
 		}	
 	}
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////
 
 struct http_conntrack* find_http_conntrack(struct _skb *skb)
 {
@@ -254,6 +262,92 @@ struct request_conntrack* find_request_conntrack_by_ack(struct http_conntrack *h
 	return NULL;
 }
 
+struct http_conntrack* init_httpc(struct _skb *skb)
+{
+	struct http_conntrack *httpc;
+	httpc=(struct http_conntrack*)new_page(sizeof(struct  http_conntrack));
+	if(!httpc)
+	{
+		return NULL;
+	}
+	thread_lock();	
+	httpc->ip = skb->iph->daddr;
+	strcpy(httpc->host , skb->hhdr.host);
+	INIT_LIST_HEAD(&(httpc->request_conntrack_list));
+	la_list_add_tail(&(httpc->list), &(httpc_list));
+	thread_unlock();
+	return httpc;
+}
+
+struct request_conntrack* init_request(struct http_conntrack *httpc,struct _skb *skb)
+{
+	struct request_conntrack *reqc;
+	reqc=(struct request_conntrack*)new_page(sizeof(struct  request_conntrack));
+	if(!reqc)
+	{
+		return NULL;
+	}
+	thread_lock();		
+	reqc->skb=skb;
+	reqc->content_length=0;
+	reqc->curr_content_length=0;
+	reqc->response_conntrack_num=0;
+	INIT_LIST_HEAD(&(reqc->response_conntrack_list));
+	httpc->request_conntrack_num++;
+	la_list_add_tail(&(reqc->list),&(httpc->request_conntrack_list));
+	thread_unlock();
+	return reqc;
+}
+
+int update_request_from_skb(struct request_conntrack *reqc,
+	struct _skb *skb)
+{
+	thread_lock();	
+	free_page(reqc->skb);
+	reqc->skb=skb;
+	reqc->content_length=0;
+	reqc->curr_content_length=0;
+	reqc->response_conntrack_num=0;
+	thread_unlock();	
+	return 0;
+}
+
+int update_request_from_response(struct request_conntrack *reqc,
+	struct response_conntrack *resc)
+{
+	thread_lock();	
+	if(resc->skb->hhdr.res_type!=HTTP_RESPONSE_TYPE_OTHER)
+	{
+		reqc->skb->hhdr.res_type = resc->skb->hhdr.res_type;
+		if(reqc->skb->hhdr.res_type == HTTP_RESPONSE_TYPE_CONTENTLENGTH)
+		{
+			strcpy(reqc->skb->hhdr.content_length , resc->skb->hhdr.content_length);
+			reqc->content_length =atoi(resc->skb->hhdr.content_length) + 
+				resc->skb->httph_len+strlen("\r\n\r\n");
+		}
+	}
+	reqc->curr_content_length=reqc->curr_content_length+resc->skb->http_len;
+	thread_unlock();
+	return 0;
+}
+
+struct response_conntrack* init_respose(struct request_conntrack *reqc,struct _skb *skb)
+{
+	struct response_conntrack *resc;
+	resc=(struct response_conntrack*)new_page(sizeof(struct  response_conntrack));
+	if(!resc)
+	{
+		return NULL;
+	}
+	
+	thread_lock();	
+	resc->skb=skb;				
+	reqc->response_conntrack_num++;
+	ipqm.current_skb_num++;					
+	la_list_add_tail(&(resc->list),&(reqc->response_conntrack_list));
+	thread_unlock();	
+	return resc;
+}
 
 int decode_http(struct _skb *skb)
 {
@@ -401,7 +495,7 @@ int decode_http(struct _skb *skb)
 	skb->http_data=strstr(skb->http_head, http_head_end[1]);
 	if(!skb->http_data)
 	{
-		return -1;
+		return 0;
 	}
 	
 	skb->httph_len=strlen(skb->http_head)-strlen(skb->http_data);
@@ -490,20 +584,15 @@ void decode(void* arg)
 		httpc=find_http_conntrack(skb);
 		if(!httpc)
 		{
-			httpc=(struct http_conntrack*)new_page(sizeof(struct  http_conntrack));
+			
+			httpc=init_httpc(skb);
 			if(!httpc)
 			{
 				send_one_package_accept(skb);
 				free_page(skb);
 				continue;
+
 			}
-			thread_lock();	
-			httpc->ip = skb->iph->daddr;
-			strcpy(httpc->host , skb->hhdr.host);
-			INIT_LIST_HEAD(&(httpc->request_conntrack_list));
-			la_list_add_tail(&(httpc->list), &(httpc_list));
-			thread_unlock();
-			
 		}
 		
 		switch (skb->hhdr.http_type)
@@ -520,26 +609,21 @@ void decode(void* arg)
 				reqc=find_request_conntrack_by_uri(httpc ,skb);
 				if(!reqc)
 				{
-					reqc=(struct request_conntrack*)new_page(sizeof(struct  request_conntrack));
+					reqc=init_request(httpc,skb);
 					if(!reqc)
 					{
 						send_one_package_accept(skb);
 						free_page(skb);
 						continue;
+
 					}
-					thread_lock();		
-					reqc->skb=skb;
-					INIT_LIST_HEAD(&(reqc->response_conntrack_list));
-					la_list_add_tail(&(reqc->list),&(httpc->request_conntrack_list));
-					httpc->request_conntrack_num++;		
-					thread_unlock();
 					send_one_package_accept(skb);
 				}
 				else
 				{
-					free_page(reqc->skb);
-					reqc->skb=skb;
+					//debug_log("~~~~~~~~~~~~~~~~~~~~~~~~~~~%d\n" , reqc->response_conntrack_num);
 					send_one_package_accept(skb);
+					update_request_from_skb(reqc , skb);
 				}
 				break;
 			}
@@ -559,30 +643,17 @@ void decode(void* arg)
 				}
 				else
 				{
-					resc=(struct response_conntrack*)new_page(sizeof(struct  response_conntrack));
+					resc=init_respose(reqc , skb);
 					if(!resc)
 					{
 						send_one_package_accept(skb);
 						free_page(skb);
 						continue;
+
 					}
-					thread_lock();	
-					resc->skb=skb;				
-					reqc->response_conntrack_num++;
-					ipqm.current_skb_num++;
-					if(resc->skb->hhdr.res_type!=HTTP_RESPONSE_TYPE_OTHER)
-					{
-						reqc->skb->hhdr.res_type = resc->skb->hhdr.res_type;
-						if(reqc->skb->hhdr.res_type == HTTP_RESPONSE_TYPE_CONTENTLENGTH)
-						{
-							strcpy(reqc->skb->hhdr.content_length , resc->skb->hhdr.content_length);
-							reqc->content_length =atoi(resc->skb->hhdr.content_length) + 
-								resc->skb->httph_len+strlen("\r\n\r\n");
-						}
-					}
-					reqc->curr_content_length=reqc->curr_content_length+resc->skb->http_len;
-					la_list_add_tail(&(resc->list),&(reqc->response_conntrack_list));
-					thread_unlock();
+					
+					update_request_from_response(reqc , resc);
+					
 				}
 				break;			
 			}			
