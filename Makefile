@@ -4,9 +4,9 @@ SRC 			= $(wildcard *.c)
 OBJS 			= $(patsubst %.c,%.o,$(SRC))
 
 APP_INCLUDE += -I./include
-LIBRARY	=  -lpthread -lipq
+LIBRARY	=  -lpthread
 
-TARGET			= guanggao
+TARGET			= dpmp
 
 CFLAGS 			= $(CFLAGS_EXTRA) -Wall -g -o  
 

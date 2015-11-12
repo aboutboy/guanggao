@@ -28,7 +28,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <linux/netfilter.h>
-#include <libipq.h>
+#include "libipq.h"
 
 
 #include "list.h"
@@ -70,7 +70,7 @@ struct ipq_msg
 {
 	struct ipq_handle *h;
 	int status;
-	int current_skb_num;
+	long current_skb_num;
 	unsigned char buf[BUFSIZE];
 };
 
@@ -121,7 +121,7 @@ struct http_conntrack
 	struct list_head request_conntrack_list;
 	unsigned long ip;
 	char host[COMM_MAX_LEN];
-	unsigned short request_conntrack_num;
+	short request_conntrack_num;
 	unsigned long last_time;
 };
 
@@ -130,9 +130,10 @@ struct request_conntrack
 	struct list_head list;
 	struct list_head response_conntrack_list;
 	struct _skb* skb;
+	char is_send;
 	unsigned short curr_content_length;
 	unsigned short content_length;
-	unsigned short response_conntrack_num;
+	short response_conntrack_num;
 };
 struct response_conntrack
 {
