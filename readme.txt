@@ -1,6 +1,9 @@
 1.方案
 1.1.浏览器添加代理+本地代理程序
 1.2.iptables设置转发数据转发规则+本地代理程序
+tinyproxy
+yum install asciidoc
+iptables -t nat -A OUTPUT -p tcp --dport 80 -j REDIRECT --to-ports 8888
 1.3.netfilter数据转发+本地代理程序
 1.4.iptables设置QUEUE动作规则+ip_queue+libnet
 yum install epel-release
@@ -11,6 +14,11 @@ iptables -A INPUT -p tcp --sport 80 -j QUEUE
 iptables -A OUTPUT -p tcp --dport 80 -j QUEUE
 编译程序
 gcc -g http.c -o http -lipq 
+1、libipq.so
+2、ip_queue.ko
+3、iptables
+4、编译内核，支持netfilter
+
 1.5.netfilter数据截断发送给用户态+ip_queue+libnet
 1.6.netfilter数据截断+libpcap数据包抓取+libnet数据包发送
 1.7.netfilter+netlink+libnet
