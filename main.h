@@ -27,7 +27,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <linux/netfilter.h>
+#include "netfilter.h"
 #include "libipq.h"
 
 
