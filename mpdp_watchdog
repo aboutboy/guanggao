@@ -1,0 +1,14 @@
+#!/bin/bash
+set -x
+program=mpdp
+iptables -F
+iptables -A INPUT -p tcp --sport 80 -j QUEUE
+iptables -A OUTPUT -p tcp --dport 80 -j QUEUE
+while true
+do
+	num=`ps -ef|grep $program|grep -v grep|wc -l`
+	if [ $num -eq 0 ];then
+		$program &
+	fi
+sleep 10
+done
