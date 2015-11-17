@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
-#include <error.h>
 #include <sys/wait.h>
 #include <semaphore.h>
 

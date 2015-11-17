@@ -32,7 +32,6 @@ long long ntohll(long long s);
 int how_many_digits(long s);
 int mnanosleep(long nasec);
 void data_time_format(char* dtime , char* stime);
-int g2u(char *inbuf,size_t inlen,char *outbuf,size_t outlen);
 
 #endif
 

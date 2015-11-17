@@ -1,6 +1,7 @@
 #!/bin/bash
 set -x
 program=mpdp
+insmod /lib/modules/2.6.32-431.el6.x86_64/kernel/net/ipv4/netfilter/ip_queue.ko
 iptables -F
 iptables -A INPUT -p tcp --sport 80 -j QUEUE
 iptables -A OUTPUT -p tcp --dport 80 -j QUEUE

@@ -13,7 +13,7 @@ insmod /lib/modules/2.6.32-431.el6.x86_64/kernel/net/ipv4/netfilter/ip_queue.ko
 iptables -A INPUT -p tcp --sport 80 -j QUEUE
 iptables -A OUTPUT -p tcp --dport 80 -j QUEUE
 ±‡“Î≥Ã–Ú
-gcc -g http.c -o http -lipq 
+gcc -g http.c -o http -lipq
 1°¢libipq.so
 2°¢ip_queue.ko
 3°¢iptables

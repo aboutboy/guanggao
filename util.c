@@ -1,5 +1,4 @@
 #include "main.h"
-#include <iconv.h>
 
 /****************************************************************
  *  
@@ -694,27 +693,4 @@ void data_time_format(char* dtime , char* stime)
 	
 }
 
-static int code_convert(char *from_charset,char *to_charset,char *inbuf,size_t  inlen,char *outbuf,size_t  outlen)
-{
-	iconv_t cd;
-	char **pin = &inbuf;
-	char **pout = &outbuf;
-	
-	cd = iconv_open(to_charset,from_charset);
-	if (!cd) 
-		return -1;
-	
-	if (iconv(cd,pin,&inlen,pout,&outlen)==-1)
-	{
-		iconv_close(cd);
-		return -1;
-	}
-	iconv_close(cd);
-	return 0;
-}
-
-int g2u(char *inbuf,size_t inlen,char *outbuf,size_t outlen)
-{
-	return code_convert("gbk","utf-8",inbuf,inlen,outbuf,outlen);
-}
 
