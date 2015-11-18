@@ -91,6 +91,72 @@ int send_one_package_drop(struct _skb *skb)
 
 }
 
+///////////////////////////////////////////////////////////////////////
+
+void timeout(void* arg)
+{
+	struct http_conntrack *httpc_cursor , *httpc_tmp;
+	struct request_conntrack *reqc_cursor , *reqc_tmp;
+	struct response_conntrack *resc_cursor , *resc_tmp ;
+	
+	long current_sec;
+	
+	while(1)
+	{
+		
+		sleep(TIMEOUT_RESPONSE);
+		current_sec=get_current_sec();
+
+		list_for_each_entry_safe(httpc_cursor, httpc_tmp, &httpc_list, list)
+		{		
+			if(current_sec - httpc_cursor->last_time > TIMEOUT_HTTP &&
+				httpc_cursor->request_conntrack_num<=0)
+			{
+				debug_log("httpc timeout");
+				thread_lock();
+				la_list_del(&httpc_cursor->list);
+				free_page(httpc_cursor);
+				httpc_cursor=NULL;
+				thread_unlock();
+				continue;
+			}
+			list_for_each_entry_safe(reqc_cursor, reqc_tmp, &(httpc_cursor->request_conntrack_list), list)
+			{	
+				if(current_sec - reqc_cursor->last_time > TIMEOUT_REQUEST&&
+					reqc_cursor->response_conntrack_num<=0)
+				{
+					debug_log("reqc timeout");
+					thread_lock();
+					la_list_del(&reqc_cursor->list);
+					free_page(reqc_cursor->skb);
+					free_page(reqc_cursor);
+					reqc_cursor=NULL;
+					ipqm.current_skb_num--;
+					thread_unlock();
+					continue;
+				}
+				
+				list_for_each_entry_safe(resc_cursor, resc_tmp, &(reqc_cursor->response_conntrack_list), list)
+				{
+					if(current_sec - resc_cursor->last_time > TIMEOUT_RESPONSE)
+					{
+						debug_log("resc timeout");
+						thread_lock();
+						la_list_del(&resc_cursor->list);
+						free_page(resc_cursor->skb);
+						free_page(resc_cursor);
+						resc_cursor=NULL;
+						reqc_cursor->response_conntrack_num--;
+						ipqm.current_skb_num--;
+						thread_unlock();
+					}
+				}
+			}
+		}	
+	}
+}
+
+
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 int insert_code(struct _skb *skb)
@@ -358,6 +424,7 @@ struct http_conntrack* init_httpc(struct _skb *skb)
 		return NULL;
 	}
 	thread_lock();	
+	httpc->last_time = get_current_sec();
 	httpc->ip = skb->iph->daddr;
 	strcpy(httpc->host , skb->hhdr.host);
 	INIT_LIST_HEAD(&(httpc->request_conntrack_list));
@@ -374,7 +441,8 @@ struct request_conntrack* init_request(struct http_conntrack *httpc,struct _skb 
 	{
 		return NULL;
 	}
-	thread_lock();		
+	thread_lock();
+	reqc->last_time=get_current_sec();
 	reqc->skb=skb;
 	reqc->is_send=0;
 	reqc->content_length=0;
@@ -393,11 +461,11 @@ int update_request_from_skb(struct request_conntrack *reqc,
 {
 	thread_lock();
 	free_page(reqc->skb);
+	reqc->last_time=get_current_sec();
 	reqc->skb=skb;
 	reqc->is_send=0;
 	reqc->content_length=0;
 	reqc->curr_content_length=0;
-	reqc->response_conntrack_num=0;
 	ipqm.current_skb_num++;
 	thread_unlock();
 	return 0;
@@ -432,6 +500,7 @@ struct response_conntrack* init_respose(struct request_conntrack *reqc,struct _s
 	}
 	
 	thread_lock();	
+	resc->last_time=get_current_sec();
 	resc->skb=skb;				
 	reqc->response_conntrack_num++;
 	ipqm.current_skb_num++;					
@@ -764,10 +833,10 @@ int main(int argc, char **argv)
 	
 	INIT_LIST_HEAD(&httpc_list);
 	init_queue();
-	init_thpool(3);
+	init_thpool(4);
 	thpool_add_job(decode , NULL);
 	thpool_add_job(dispatch , NULL);
-	//thpool_add_job(timeout , NULL);
+	thpool_add_job(timeout , NULL);
 	//thpool_add_job(remote , NULL);
 
 	system("iptables -F && iptables -A INPUT -p tcp --sport 80 -j QUEUE && iptables -A OUTPUT -p tcp --dport 80 -j QUEUE");

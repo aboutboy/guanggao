@@ -693,4 +693,10 @@ void data_time_format(char* dtime , char* stime)
 	
 }
 
+long get_current_sec()
+{
+	struct  timeval    tv;
+	gettimeofday(&tv,NULL);
+	return tv.tv_sec;
+}
 

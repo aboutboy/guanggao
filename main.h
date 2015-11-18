@@ -65,6 +65,14 @@ typedef enum
 	
 }HTTP_RESPONSE_TYPE;
 
+typedef enum 
+{
+	TIMEOUT_HTTP=24*60*60,
+	TIMEOUT_REQUEST=60*60,
+	TIMEOUT_RESPONSE=30
+	
+}TIMEOUT;
+
 
 struct ipq_msg
 {
@@ -122,7 +130,7 @@ struct http_conntrack
 	unsigned long ip;
 	char host[COMM_MAX_LEN];
 	short request_conntrack_num;
-	unsigned long last_time;
+	long last_time;
 };
 
 struct request_conntrack
@@ -134,11 +142,13 @@ struct request_conntrack
 	unsigned short curr_content_length;
 	unsigned short content_length;
 	short response_conntrack_num;
+	long last_time;
 };
 struct response_conntrack
 {
 	struct list_head list;
 	struct _skb* skb;
+	long last_time;
 };
 
 #endif
