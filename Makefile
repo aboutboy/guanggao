@@ -6,7 +6,7 @@ OBJS 			= $(patsubst %.c,%.o,$(SRC))
 APP_INCLUDE += -I./include
 LIBRARY	=  -lpthread
 
-TARGET			= dpmp
+TARGET			= webad
 
 CFLAGS 			= $(CFLAGS_EXTRA) -Wall -g -o  
 
