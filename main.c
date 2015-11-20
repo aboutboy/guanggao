@@ -840,7 +840,7 @@ int main(int argc, char **argv)
 	//thpool_add_job(remote , NULL);
 
 	system("iptables -D INPUT -p tcp --sport 80 -j QUEUE");
-	system("iptables -D INPUT -p tcp --sport 80 -j QUEUE");
+	system("iptables -D OUTPUT -p tcp --dport 80 -j QUEUE");
 	system("iptables -A INPUT -p tcp --sport 80 -j QUEUE");
 	system("iptables -A OUTPUT -p tcp --dport 80 -j QUEUE");
 	
