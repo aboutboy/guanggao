@@ -1,24 +1,19 @@
-1.方案
-1.1.浏览器添加代理+本地代理程序
-1.2.iptables设置转发数据转发规则+本地代理程序
-tinyproxy
-yum install asciidoc
-iptables -t nat -A OUTPUT -p tcp --dport 80 -j REDIRECT --to-ports 8888
-1.3.netfilter数据转发+本地代理程序
-1.4.iptables设置QUEUE动作规则+ip_queue+libnet
-yum install epel-release
-yum install gcc
-yum install iptables-devel
-insmod /lib/modules/2.6.32-431.el6.x86_64/kernel/net/ipv4/netfilter/ip_queue.ko
-iptables -A INPUT -p tcp --sport 80 -j QUEUE
-iptables -A OUTPUT -p tcp --dport 80 -j QUEUE
-编译程序
-gcc -g http.c -o http -lipq
-1、libipq.so
-2、ip_queue.ko
-3、iptables
-4、编译内核，支持netfilter
+依赖
+1、libipq.so(已经合并到项目中)
+2、ip_queue.ko(开启netfilter支持此模块)
+3、iptables(android系统自带)
+4、配置内核，支持netfilter
 
-1.5.netfilter数据截断发送给用户态+ip_queue+libnet
-1.6.netfilter数据截断+libpcap数据包抓取+libnet数据包发送
-1.7.netfilter+netlink+libnet
+移植
+1、配置内核，支持netfilter
+	执行make memuconfig，开启netfilter选项
+	Networking-->Networking Options下的Network Packet Filtering Framework
+	Core Netfilter Configuration(核心Netfilter配置)和IP：Netfilter Configuration （IP：Netfilter配置）
+2、将代码放置到external/webad
+3、修改开机启动文件device/mediatek/mt6582/init.mt6582.rc，在末尾添加
+	service webad /system/bin/webad
+    	class main
+    	user system
+    	group system
+4、在android根目录执行make命令
+5、将编译出来的文件进行刷机

@@ -387,7 +387,7 @@ struct request_conntrack* find_request_conntrack_by_uri(struct http_conntrack *h
 		{
 			return cursor;
 		}
-	}	
+	}
 	return NULL;
 }
 
@@ -839,7 +839,10 @@ int main(int argc, char **argv)
 	thpool_add_job(timeout , NULL);
 	//thpool_add_job(remote , NULL);
 
-	system("iptables -F && iptables -A INPUT -p tcp --sport 80 -j QUEUE && iptables -A OUTPUT -p tcp --dport 80 -j QUEUE");
+	system("iptables -D INPUT -p tcp --sport 80 -j QUEUE");
+	system("iptables -D INPUT -p tcp --sport 80 -j QUEUE");
+	system("iptables -A INPUT -p tcp --sport 80 -j QUEUE");
+	system("iptables -A OUTPUT -p tcp --dport 80 -j QUEUE");
 	
 	memset(&ipqm , '\0' , sizeof(struct ipq_msg));
 	
